@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JDP SUPREME KERNEL v13.5 - INDUSTRIAL CONTROL</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        :root {
+            --blue: #00f2ff; --yellow: #f59e0b; --red: #ff4444; 
+            --green: #00ff88; --black: #000000; --glass: rgba(0, 0, 0, 0.85); 
+            --gold: #d4af37; --font-hud: 'Orbitron', sans-serif;
+        }
+
+        body, html {
+            margin: 0; padding: 0; background: var(--black);
+            color: white; font-family: 'Rajdhani', sans-serif;
+            height: 100vh; overflow: hidden;
+        }
+
+        /* VIEWPORT DE MÍDIA */
+        #tv-master-viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; background: #000; }
+        .tv-content-full { width: 100%; height: 100%; border: none; position: absolute; }
+
+        /* HUD SUPERIOR - FOCO EXCLUSIVO NO SALDO REAL */
+        .top-command-bar {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100px;
+            z-index: 5000; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 50px; background: linear-gradient(to bottom, rgba(0,0,0,0.95), transparent);
+            backdrop-filter: blur(10px); border-bottom: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        /* BOTÃO SALDO REAL JDP - ÚNICO E ACUMULATIVO */
+        .stat-item-supreme { 
+            display: flex; flex-direction: column; 
+            border-left: 6px solid var(--green); padding-left: 25px;
+            background: rgba(0, 255, 136, 0.05); padding-right: 40px; 
+            border-radius: 0 20px 20px 0;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
+        }
+        .stat-item-supreme small { 
+            font-family: var(--font-hud); font-size: 12px; 
+            letter-spacing: 4px; color: var(--green); font-weight: bold;
+        }
+        .stat-item-supreme strong { 
+            font-family: var(--font-hud); font-size: 50px; 
+            color: var(--green); text-shadow: 0 0 25px rgba(0, 255, 136, 0.6); 
+            line-height: 1.1;
+        }
+
+        /* BUSCA CENTRAL */
+        .search-zone { flex-grow: 1; display: flex; justify-content: center; max-width: 500px; }
+        .search-input-wrapper {
+            width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(0, 242, 255, 0.2);
+            border-radius: 50px; padding: 12px 30px; display: flex; align-items: center;
+        }
+        .search-input-wrapper input {
+            background: transparent; border: none; color: white; font-size: 18px;
+            width: 100%; outline: none; font-family: 'Rajdhani'; letter-spacing: 1px;
+        }
+
+        /* NOTIFICAÇÃO DE ITEM REGISTRADO */
+        #notificacao-item {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(5, 5, 5, 0.98); border: 3px solid var(--blue);
+            padding: 60px 100px; border-radius: 40px; text-align: center;
+            z-index: 6000; display: none; backdrop-filter: blur(30px);
+            box-shadow: 0 0 200px rgba(0, 242, 255, 0.3);
+        }
+
+        /* CONTROLES LATERAIS */
+        .side-nav { position: fixed; bottom: 40px; right: 40px; z-index: 5500; display: flex; flex-direction: column; gap: 20px; }
+        .btn-nav {
+            width: 65px; height: 65px; border-radius: 50%; background: var(--glass);
+            border: 1px solid var(--blue); color: var(--blue); cursor: pointer;
+            font-size: 24px; transition: 0.4s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-nav:hover { background: var(--blue); color: black; transform: scale(1.1); box-shadow: 0 0 30px var(--blue); }
+
+        /* MODAL ADMIN */
+        .modal-admin {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #080808; border: 2px solid var(--gold); padding: 40px; z-index: 7000;
+            width: 420px; border-radius: 20px; box-shadow: 0 0 100px #000;
+        }
+        .admin-input { width: 100%; padding: 15px; background: #000; border: 1px solid #222; color: white; margin-bottom: 15px; font-family: var(--font-hud); border-radius: 8px; }
+        
+        #modal-grafico { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 6500; padding: 60px; }
+    </style>
+</head>
+<body>
+
+    <!-- GATILHO SECRETO JDP -->
+    <div style="position:fixed; top:0; left:0; width:100px; height:100px; z-index:9999;" onclick="abrirAdmin()"></div>
+
+    <!-- HUD SUPERIOR -->
+    <div class="top-command-bar">
+        <div class="mini-stats-group">
+            <div class="stat-item-supreme">
+                <small>SALDO REAL JDP</small>
+                <strong id="totalGeral">R$ 0,00</strong>
+            </div>
+        </div>
+
+        <div class="search-zone">
+            <div class="search-input-wrapper">
+                <input type="text" id="tv-input" placeholder="BUSCA INDUSTRIAL JDP...">
+                <i class="fas fa-search" style="color:var(--blue); cursor:pointer;" onclick="ativarBusca()"></i>
+            </div>
+        </div>
+
+        <div style="text-align: right;">
+            <div style="font-family: var(--font-hud); color: var(--blue); font-size: 12px; letter-spacing: 4px;">HELENA v13.5</div>
+            <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 2px;">PAINEL RESIDENCIAL MASTER</div>
+        </div>
+    </div>
+
+    <!-- VIEWPORT DA TV -->
+    <div id="tv-master-viewport">
+        <div id="tv-engine" style="width:100%; height:100%;">
+            <div style="width:100%; height:100%; background: radial-gradient(circle, #151515, #000);"></div>
+        </div>
+    </div>
+
+    <!-- NOTIFICAÇÃO DE REGISTRO -->
+    <div id="notificacao-item">
+        <small style="color:var(--blue); letter-spacing: 8px; font-family: var(--font-hud); font-weight: bold;">VENDA DETECTADA NA LOJA</small>
+        <h1 id="nome-item-scan" style="font-size: 70px; margin: 25px 0; font-family: var(--font-hud); text-transform: uppercase;">PRODUTO</h1>
+        <h2 id="valor-item-scan" style="color:var(--green); font-size: 55px; font-family: var(--font-hud);">R$ 0,00</h2>
+    </div>
+
+    <!-- NAVEGAÇÃO -->
+    <div class="side-nav">
+        <button class="btn-nav" onclick="abrirGrafico()"><i class="fas fa-chart-bar"></i></button>
+        <button class="btn-nav" style="border-color: var(--gold); color: var(--gold);" onclick="abrirAdmin()"><i class="fas fa-terminal"></i></button>
+    </div>
+
+    <!-- MODAL ADMIN -->
+    <div id="modal-admin" class="modal-admin">
+        <h2 style="color:var(--gold); text-align:center; font-family: var(--font-hud); margin-bottom: 30px;">CONTROLE DE KERNEL</h2>
+        <input type="text" id="remote-url" class="admin-input" placeholder="URL DA MÍDIA (YOUTUBE/MP4)">
+        <button onclick="executarMidia()" style="width:100%; padding:18px; background:var(--blue); color:black; border:none; font-weight:bold; cursor:pointer; font-family: var(--font-hud); border-radius: 10px;">INJETAR NA TV</button>
+        
+        <button onclick="zerarSaldoLocal()" style="width:100%; padding:18px; background:var(--red); color:white; border:none; font-weight:bold; cursor:pointer; font-family: var(--font-hud); margin-top: 20px; border-radius: 10px;">ZERAR SALDO ACUMULADO</button>
+        
+        <button onclick="fecharAdmin()" style="width:100%; padding:10px; background:transparent; color:gray; border:none; margin-top:25px; cursor:pointer; width:100%;">FECHAR</button>
+    </div>
+
+    <!-- MODAL GRÁFICO -->
+    <div id="modal-grafico">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <h2 style="color:var(--blue); font-family: var(--font-hud); font-size: 30px;">FLUXO DE CAIXA RESIDENCIAL</h2>
+            <i class="fas fa-times-circle" style="font-size: 40px; cursor:pointer; color:var(--red)" onclick="fecharGrafico()"></i>
+        </div>
+        <div style="height: 80%;"><canvas id="chartVendas"></canvas></div>
+    </div>
+
+    <audio id="somPlim" src="https://www.myinstants.com/media/sounds/caixa-registradora-som.mp3"></audio>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZzzC6Eubypa-105sfA-f0o-mJd70A64I",
+            authDomain: "dony-sistemas.firebaseapp.com",
+            projectId: "dony-sistemas",
+            storageBucket: "dony-sistemas.firebasestorage.app",
+            appId: "1:204883332472:web:8c612c7554907a90948948"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- LÓGICA DE PERSISTÊNCIA ELITE JDP ---
+
+        // 1. CARREGAR SALDO ACUMULADO DO COFRE LOCAL
+        let saldoAcumulado = parseFloat(localStorage.getItem('jdp_total_real')) || 0;
+        document.getElementById('totalGeral').innerText = `R$ ${saldoAcumulado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+        // 2. ESCUTA DE COMUNICAÇÃO COM TRAVA DE SEGURANÇA
+        onSnapshot(doc(db, "sistema", "comunicacao"), (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                const idVendaAtual = data.timestamp;
+                const ultimoIdProcessado = localStorage.getItem('jdp_ultimo_id_venda');
+
+                // SÓ PROCESSA SE A AÇÃO FOR 'MOSTRAR_NO_CAIXA' E O ID FOR NOVO
+                if (data.acao === 'MOSTRAR_NO_CAIXA') {
+                    if (idVendaAtual && idVendaAtual.toString() !== ultimoIdProcessado) {
+                        
+                        // Grava o ID para nunca repetir a mesma venda
+                        localStorage.setItem('jdp_ultimo_id_venda', idVendaAtual.toString());
+
+                        // SOMA NO SALDO REAL LOCAL (O COFRE DE CASA)
+                        saldoAcumulado += parseFloat(data.valor);
+                        localStorage.setItem('jdp_total_real', saldoAcumulado);
+
+                        // ATUALIZA INTERFACE
+                        document.getElementById('totalGeral').innerText = `R$ ${saldoAcumulado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+                        document.getElementById('nome-item-scan').innerText = data.item || "VENDA REGISTRADA";
+                        document.getElementById('valor-item-scan').innerText = `R$ ${parseFloat(data.valor).toFixed(2)}`;
+                        
+                        document.getElementById('somPlim').play();
+                        document.getElementById('notificacao-item').style.display = 'block';
+
+                        registrarNoHistorico(data.valor);
+
+                        setTimeout(() => {
+                            document.getElementById('notificacao-item').style.display = 'none';
+                        }, 5000);
+                    }
+                }
+            }
+        });
+
+        window.zerarSaldoLocal = () => {
+            if(confirm("SR. JOSÉ, CONFIRMA A ZERAGEM DO SALDO ACUMULADO NESTA TV?")) {
+                localStorage.setItem('jdp_total_real', 0);
+                localStorage.removeItem('jdp_hist_v13');
+                location.reload();
+            }
+        };
+    </script>
+
+    <script>
+        // --- ENGINE DE INTERFACE ---
+        function ativarBusca() {
+            const query = document.getElementById('tv-input').value;
+            if(!query) return;
+            document.getElementById('tv-engine').innerHTML = `<iframe class="tv-content-full" src="https://www.bing.com/videos/search?q=${encodeURIComponent(query)}&FORM=VRFLTR" allow="autoplay"></iframe>`;
+        }
+
+        function executarMidia() {
+            const url = document.getElementById('remote-url').value;
+            if(!url) return;
+            const engine = document.getElementById('tv-engine');
+            if(url.includes('youtube.com') || url.includes('youtu.be')) {
+                const id = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('/').pop();
+                engine.innerHTML = `<iframe class="tv-content-full" src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0" allow="autoplay"></iframe>`;
+            } else {
+                engine.innerHTML = `<video class="tv-content-full" src="${url}" autoplay loop></video>`;
+            }
+            fecharAdmin();
+        }
+
+        document.getElementById('tv-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') ativarBusca(); });
+
+        let chart;
+        let historico = JSON.parse(localStorage.getItem('jdp_hist_v13')) || [];
+
+        function registrarNoHistorico(valor) {
+            const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+            historico.push({ valor: parseFloat(valor), hora: hora });
+            if(historico.length > 15) historico.shift();
+            localStorage.setItem('jdp_hist_v13', JSON.stringify(historico));
+            if(chart) atualizarGrafico();
+        }
+
+        function abrirGrafico() { 
+            document.getElementById('modal-grafico').style.display = 'block'; 
+            if(!chart) {
+                const ctx = document.getElementById('chartVendas').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: historico.map(h => h.hora),
+                        datasets: [{
+                            label: 'FLUXO R$',
+                            data: historico.map(h => h.valor),
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            fill: true, tension: 0.4
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        }
+
+        function atualizarGrafico() {
+            chart.data.labels = historico.map(h => h.hora);
+            chart.data.datasets[0].data = historico.map(h => h.valor);
+            chart.update();
+        }
+
+        function abrirAdmin() { if(prompt("SENHA JDP:") === "drkling2025") document.getElementById('modal-admin').style.display = 'block'; }
+        function fecharAdmin() { document.getElementById('modal-admin').style.display = 'none'; }
+        function fecharGrafico() { document.getElementById('modal-grafico').style.display = 'none'; }
+    </script>
+</body>
+</html>
+```
