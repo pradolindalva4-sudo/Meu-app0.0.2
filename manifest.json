@@ -1,6 +1,6 @@
 {
   "short_name": "DonySistema",
-  "name": "JDP SUPREME KERNEL v13.5 - INDUSTRIAL CONTRO- DonySoluctions",
+  "name": "JDP DonySoluctions",
   "description": "Criado e desenvolvido por José Divino Plata da Lapa Engenheiro sênio",
   "icons": [
     {
@@ -19,9 +19,8 @@
   "permissions": [
     "camera",
     "bluetooth",
-    "bluetooth_admin",
     "access_fine_location"
   ],
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": true
 }
