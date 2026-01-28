@@ -444,19 +444,50 @@
             }, 500);
         }
 
-        // --- BLUETOOTH ---
+                // --- MOTOR BLUETOOTH JDP REVISADO ---
         async function conectarImpressora() {
+            // Verificar se o motor Bluetooth existe no sistema
+            if (!navigator.bluetooth) {
+                alert("ERRO: Este Android bloqueou o rádio Bluetooth. Use o Chrome ou verifique as permissões do APK.");
+                return;
+            }
+
             try {
+                // Varredura mais ampla: aceita qualquer dispositivo para não ter erro de nome
                 const device = await navigator.bluetooth.requestDevice({ 
-                    filters: [{ namePrefix: '58' }, { namePrefix: 'Bluetooth' }],
-                    optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] 
+                    acceptAllDevices: true,
+                    optionalServices: [
+                        '000018f0-0000-1000-8000-00805f9b34fb', // Serviço 1
+                        '00001101-0000-1000-8000-00805f9b34fb'  // Serviço 2 (Serial comum)
+                    ] 
                 });
+
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                const characteristics = await service.getCharacteristics();
-                caracteristicaImpressora = characteristics.find(c => c.properties.write);
-                alert("IMPRESSORA JDP CONECTADA!");
-            } catch (e) { alert("Erro Bluetooth: " + e); }
+                
+                // Tenta encontrar o serviço de escrita (o cabo de dados)
+                const services = await server.getPrimaryServices();
+                let encontrada = false;
+
+                for (const service of services) {
+                    const characteristics = await service.getCharacteristics();
+                    // Procura uma característica que aceite ESCREVER dados
+                    const c = characteristics.find(char => char.properties.write || char.properties.writeWithoutResponse);
+                    if (c) {
+                        caracteristicaImpressora = c;
+                        encontrada = true;
+                        break;
+                    }
+                }
+
+                if (encontrada) {
+                    alert("PRINCESA DIAMANTE CONECTADA COM SUCESSO! 💎");
+                } else {
+                    alert("Impressora pareada, mas não achei o canal de escrita.");
+                }
+
+            } catch (e) { 
+                alert("Diagnóstico Helena: " + e.message); 
+            }
         }
 
         async function enviarImpressaoBluetooth(metodo) {
